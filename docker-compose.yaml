@@ -1,0 +1,12 @@
+services: 
+  kafka:
+    image: apache/kafka
+    container_name: kafka
+    ports : 
+      - "9092:9092"
+    networks:
+     - bigdata-2
+    
+networks:
+  bigdata-2:
+    driver: bridge
