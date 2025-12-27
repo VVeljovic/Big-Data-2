@@ -13,8 +13,8 @@ producer = Producer(config)
 file = open('cleaned_dataset.csv', 'r')
 line = file.readline()
 while line:
+    line = file.readline()
     producer.produce(topic="Messages", key=str(uuid4()), value=line.encode('utf-8'))
     producer.flush()
-    line = file.readline()
 
-file
+file.close()
