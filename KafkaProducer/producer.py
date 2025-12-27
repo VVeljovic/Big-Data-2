@@ -1,6 +1,7 @@
 from confluent_kafka import Producer
 from uuid import uuid4
 
+
 config = {
     'bootstrap.servers': 'localhost:9092',  # Kafka server address
     'group.id': 'my-first-group',          # Consumer group name
@@ -9,7 +10,11 @@ config = {
 
 producer = Producer(config)
 
-while True:
-    producer.produce(topic="Messages", key=str(uuid4()), value=str(uuid4()).encode('utf-8'))
-
+file = open('cleaned_dataset.csv', 'r')
+line = file.readline()
+while line:
+    producer.produce(topic="Messages", key=str(uuid4()), value=line.encode('utf-8'))
     producer.flush()
+    line = file.readline()
+
+file
