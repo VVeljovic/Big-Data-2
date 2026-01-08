@@ -205,4 +205,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 cleaned_dataset.csv
-yellow_tripdata_2025-01.csv
+yellow_tripdata_2015-01.csv

@@ -67,7 +67,7 @@ def process_batch(df, epoch_id):
     rows = df.select("csv").collect()
     accidents = [parse_csv_to_accident(row["csv"]) for row in rows]
     for acc in accidents:
-        print(acc)  # možeš i filtrirati, agregirati itd.
+        print(acc)  
 
 query = accidents_df.writeStream.foreachBatch(process_batch).start()
 query.awaitTermination()
