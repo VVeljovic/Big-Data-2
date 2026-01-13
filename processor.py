@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
-from pyspark.sql.functions import from_csv, col, count, lower, trim, avg, stddev, window, sum, min, max, to_json, struct
+from pyspark.sql.functions import from_csv, col, count, lower, trim, avg, stddev, window, sum, min, max, to_json, struct, lit
 import sys
 
 from pyspark.sql.types import (
@@ -85,15 +85,17 @@ agg_df = filtered_df.withWatermark("tpep_pickup_datetime", "30 minutes") \
 
 non_empty_df = agg_df.filter(col("count") > 0)
 
-json_df = non_empty_df.select(to_json(struct("*")).alias("value"))  
+standard_df = non_empty_df.withColumnRenamed(group_column, "group_value") \
+                         .withColumn("group_column_name", lit(group_column))
 
+json_df = standard_df.select(to_json(struct("*")).alias("value"))  
 
 query = json_df.writeStream \
     .outputMode("update") \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
     .option("topic", "aggregated_results") \
-    .option("checkpointLocation", "/tmp/spark_checkpoint") \
+    .option("checkpointLocation", "/tmp/spark_checkpoints/aggregated_results") \
     .start()
 
 query.awaitTermination()

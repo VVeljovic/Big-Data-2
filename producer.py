@@ -12,11 +12,11 @@ producer = Producer(config)
 
 file = open('yellow_tripdata_2015-01.csv', 'r', encoding='utf-8')
 
-line = file.readline()
+line = file.readline() 
 
 while line:
     producer.produce(
-        topic="inital_data",
+        topic="initial_data",
         key=str(uuid4()),
         value=line.encode("utf-8")
     )

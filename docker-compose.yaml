@@ -6,6 +6,17 @@ services:
       - "9092:9092"
     networks:
      - bigdata-2
+
+  cassandra:
+    image: cassandra:latest
+    container_name: cassandra-container
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_USER=admin
+      - CASSANDRA_PASSWORD=admin
+    networks:
+      - bigdata-2
     
 networks:
   bigdata-2:
