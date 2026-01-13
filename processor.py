@@ -1,13 +1,24 @@
-import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from pyspark.sql.functions import from_csv, col, count, lower, trim, avg, stddev, window, sum, min, max, to_json, struct
-import json
+import sys
+
 from pyspark.sql.types import (
     StructType, StructField,
     IntegerType, DoubleType,
     StringType, TimestampType
 )
+
+window_duration = sys.argv[1]      
+slide_duration = sys.argv[2]      
+window_type = sys.argv[3]          
+filter_column = sys.argv[4]       
+filter_value = int(sys.argv[5])   
+group_column = sys.argv[6]         
+agg_column = sys.argv[7]  
+
+spark = SparkSession.builder.appName("Big-Data-2").getOrCreate()
+spark.sparkContext.setLogLevel("ERROR")
 
 taxi_schema = StructType([
     StructField("VendorID", IntegerType(), True),
@@ -39,16 +50,13 @@ taxi_schema = StructType([
 ])
 schema_ddl = taxi_schema.simpleString()
 
-spark = SparkSession.builder.appName("Kafka Consumer").getOrCreate()
-spark.sparkContext.setLogLevel("ERROR")
 
 df = spark.readStream.format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "Messages") \
+    .option("subscribe", "initial_data") \
     .load()
 
 raw_df = df.selectExpr("CAST(value AS STRING) as csv_line")
-
 
 parsed_df = (
     raw_df
@@ -56,60 +64,36 @@ parsed_df = (
     .select("data.*")
 )
 
-filtered_df = (
-    parsed_df
-    #.filter((col("trip_distance") > 3) & (col("total_amount") >= 10))
-)
+filtered_df = parsed_df.filter(col(filter_column) > filter_value)
 
-agg_df = (
-    filtered_df
+if window_type == "tumbling":
+    windowed_col = window(col("tpep_pickup_datetime"), window_duration)
+else:
+    windowed_col = window(col("tpep_pickup_datetime"), window_duration, slide_duration)
     
-    .groupBy(
-        window(col("tpep_pickup_datetime"), "3 seconds"),
-        col("VendorID")
-    )
+
+agg_df = filtered_df.withWatermark("tpep_pickup_datetime", "30 minutes") \
+    .groupBy(windowed_col, col(group_column)) \
     .agg(
         count("*").alias("count"),
-        sum("trip_distance").alias("sum_distance"),
-        min("trip_distance").alias("min_distance"),
-        max("trip_distance").alias("max_distance"),
-        avg("trip_distance").alias("avg_distance"),
-        stddev("trip_distance").alias("stddev_distance")
+        sum(agg_column).alias("sum"),
+        min(agg_column).alias("min"),
+        max(agg_column).alias("max"),
+        avg(agg_column).alias("avg"),
+        stddev(agg_column).alias("stddev")
     )
-)
 
-kafka_df = agg_df.select(
-    to_json(struct(
-        col("window"),
-        col("VendorID"),
-        col("count"),
-        col("sum_distance"),
-        col("min_distance"),
-        col("max_distance"),
-        col("avg_distance"),
-        col("stddev_distance")
-    )).alias("value")
-)
+non_empty_df = agg_df.filter(col("count") > 0)
 
-query = (
-    kafka_df
-    .writeStream
-    .format("kafka")
-    .option("kafka.bootstrap.servers", "localhost:9092")
-    .option("topic", "AggregatedMessages")
-    .option("checkpointLocation", "/tmp/kafka_checkpoint/")
-    .outputMode("update")
+json_df = non_empty_df.select(to_json(struct("*")).alias("value"))  
+
+
+query = json_df.writeStream \
+    .outputMode("update") \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("topic", "aggregated_results") \
+    .option("checkpointLocation", "/tmp/spark_checkpoint") \
     .start()
-)
 
-query_console = (
-    kafka_df
-    .writeStream
-    .outputMode("update")
-    .format("console")
-    .option("truncate", False)
-    .start()
-)
-
-query_console.awaitTermination()
 query.awaitTermination()
