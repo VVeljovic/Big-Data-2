@@ -1,4 +1,3 @@
-import os
 import json
 from confluent_kafka import Consumer
 from uuid import uuid4
@@ -16,23 +15,25 @@ session.set_keyspace('taxi')
 
 session.execute("""
     CREATE TABLE IF NOT EXISTS aggregated_taxi (
-        id uuid PRIMARY KEY,
         window_start timestamp,
         window_end timestamp,
-        group int,
         group_column_name text,
+        group_column_value int,
+        condition text,
         count int,
         sum double,
         min double,
         max double,
         avg double,
-        stddev double
+        stddev double,
+        variance double,
+        median double,
+        PRIMARY KEY ((window_start, window_end), min)    
     )
 """)
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 
 config = {
-    "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
+    "bootstrap.servers": 'localhost:9092',
     "group.id": f"consumer-{uuid4()}",  
     "auto.offset.reset": "earliest"    
 }
@@ -40,6 +41,31 @@ config = {
 consumer = Consumer(config)
 
 consumer.subscribe(["aggregated_results"])
+
+def insert_aggregated_record(data, session):
+    session.execute(
+        """
+        INSERT INTO aggregated_taxi (
+            window_start, window_end, group_column_value, group_column_name,
+            count, sum, min, max, avg, stddev, variance, median, condition
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            data.get("window", {}).get("start", None),
+            data.get("window", {}).get("end", None),
+            data.get("group_value", None),
+            data.get("group_column_name", None),
+            data.get("count", None),
+            data.get("sum", None),
+            data.get("min", None),
+            data.get("max", None),
+            data.get("avg", None),
+            data.get("stddev", None),
+            data.get("variance", None),
+            data.get("median", None),
+            data.get("condition", None)
+        )
+    )
 
 try:
     while True:
@@ -54,32 +80,11 @@ try:
         print(f"Received message: {message}")
 
         data = json.loads(message)
-
-        record_id = uuid4()
-
-        session.execute(
-            """
-            INSERT INTO aggregated_taxi (
-                id, window_start, window_end, group, group_column_name,
-                count, sum, min, max, avg, stddev
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                record_id,
-                data.get("window", {}).get("start", None),
-                data.get("window", {}).get("end", None),
-                data.get("group_value", None),
-                data.get("group_column_name", None),
-                data.get("count", None),
-                data.get("sum", None),
-                data.get("min", None),
-                data.get("max", None),
-                data.get("avg", None),
-                data.get("stddev", None),
-            )
-        )
-
+        insert_aggregated_record(data, session)
 
 finally:
     consumer.close()
     print("Consumer closed")
+
+
+
