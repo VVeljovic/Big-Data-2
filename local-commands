@@ -1,0 +1,6 @@
+python producer.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1 processor.py "120 minutes" "60 minutes" tumbling passenger_count 3 VendorID trip_distance less
+docker exec -it CID bash
+cqlsh
+use taxi;
+SELECT * FROM "aggregated_taxi";

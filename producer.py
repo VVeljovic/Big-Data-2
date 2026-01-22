@@ -6,7 +6,7 @@ config = {
     "bootstrap.servers": 'localhost:9092'
 }
 topics_to_create = ["initial_data", "aggregated_results"]
-new_topics = [NewTopic(topic, num_partitions=3, replication_factor=1) for topic in topics_to_create]
+new_topics = [NewTopic(topic, num_partitions=1, replication_factor=1) for topic in topics_to_create]
 
 admin_client = AdminClient(config)
 

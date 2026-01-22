@@ -14,7 +14,6 @@ filter_condition = sys.argv[8]
 
 spark = SparkSession.builder \
     .appName("Big-Data-2") \
-    .config("spark.local.dir", "C:/spark_tmp") \
     .master("local[*]") \
     .getOrCreate()
 spark.sparkContext.setLogLevel("ERROR")
